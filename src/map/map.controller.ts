@@ -1,21 +1,23 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
   Param,
-  Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MapService } from './map.service';
 
+@UseGuards(JwtAuthGuard)
 @Controller('map')
 export class MapController {
   constructor(private readonly mapService: MapService) {}
 
-  @Post('submit-place')
-  submitPlace(@Body() body: any) {
-    return this.mapService.submitPlace(body);
+  @Get('markers')
+  getMarkers() {
+    return this.mapService.getMarkers();
   }
 
   @Get('places')
@@ -23,17 +25,17 @@ export class MapController {
     return this.mapService.getPlaces();
   }
 
-  @Patch('approve/:id')
+  @Post('places/:id/approve')
   approvePlace(@Param('id') id: string) {
     return this.mapService.approvePlace(Number(id));
   }
 
-  @Patch('reject/:id')
+  @Post('places/:id/reject')
   rejectPlace(@Param('id') id: string) {
     return this.mapService.rejectPlace(Number(id));
   }
 
-  @Delete('place/:id')
+  @Delete('places/:id')
   deletePlace(@Param('id') id: string) {
     return this.mapService.deletePlace(Number(id));
   }

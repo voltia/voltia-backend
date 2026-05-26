@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>VOLTIA Realtime Test</title>
+</head>
+
+<body>
+  <h1>VOLTIA SENTINEL SOCKET TEST</h1>
+
+  <button onclick="sendEvent()">Enviar evento crítico</button>
+
+  <pre id="log"></pre>
+
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+
+  <script>
+    const log = document.getElementById('log');
+
+    function write(message) {
+      log.textContent += message + '\n';
+    }
+
+    write('Iniciando cliente VOLTIA...');
+
+   const socket = io('http://127.0.0.1:3000', {
+  transports: ['polling', 'websocket']
+});
+
+    write('SOCKET INICIADO');
+
+    socket.on('connect', () => {
+      write('CONECTADO: ' + socket.id);
+    });
+
+    socket.on('connect_error', (error) => {
+      write('ERROR DE CONEXIÓN: ' + error.message);
+    });
+
+    socket.on('disconnect', () => {
+      write('DESCONECTADO');
+    });
+
+    socket.on('sentinel-alert', (data) => {
+      write('ALERTA RECIBIDA:');
+      write(JSON.stringify(data, null, 2));
+    });
+
+    function sendEvent() {
+      write('ENVIANDO EVENTO CRÍTICO...');
+
+      socket.emit(
+        'security-event',
+        {
+          risk: 'CRITICAL',
+          action: 'LOCKDOWN',
+          device: 'ANDROID-001'
+        },
+        (response) => {
+          write('RESPUESTA:');
+          write(JSON.stringify(response, null, 2));
+        }
+      );
+    }
+  </script>
+</body>
+</html>

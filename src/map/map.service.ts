@@ -1,89 +1,84 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { PlaceSubmission } from './entities/place-submission.entity';
+import { Injectable } from '@nestjs/common';
+
+export type VoltiaMarkerType = 'USER' | 'RISK' | 'SOS' | 'PATROL' | 'SAFE_ZONE';
+
+export interface VoltiaMarker {
+  id: number;
+  lat: number;
+  lng: number;
+  title: string;
+  type: VoltiaMarkerType;
+}
 
 @Injectable()
 export class MapService {
-  constructor(
-    @InjectRepository(PlaceSubmission)
-    private readonly placeRepository: Repository<PlaceSubmission>,
-  ) {}
+  private readonly markers: VoltiaMarker[] = [
+    {
+      id: 1,
+      lat: 18.4861,
+      lng: -69.9312,
+      title: 'Usuario activo',
+      type: 'USER',
+    },
+    {
+      id: 2,
+      lat: 18.5,
+      lng: -69.9,
+      title: 'Zona de riesgo',
+      type: 'RISK',
+    },
+    {
+      id: 3,
+      lat: 18.47,
+      lng: -69.95,
+      title: 'SOS activo',
+      type: 'SOS',
+    },
+    {
+      id: 4,
+      lat: 18.49,
+      lng: -69.88,
+      title: 'Patrulla VOLTIA',
+      type: 'PATROL',
+    },
+    {
+      id: 5,
+      lat: 18.46,
+      lng: -69.92,
+      title: 'Zona segura',
+      type: 'SAFE_ZONE',
+    },
+  ];
 
-  async submitPlace(body: {
-    userId: string;
-    placeName: string;
-    latitude: number;
-    longitude: number;
-    description: string;
-  }) {
-    const place = this.placeRepository.create({
-      userId: body.userId,
-      placeName: body.placeName,
-      latitude: body.latitude,
-      longitude: body.longitude,
-      description: body.description,
-      status: 'pending',
-    });
+  getMarkers(): VoltiaMarker[] {
+    return this.markers;
+  }
 
-    const saved = await this.placeRepository.save(place);
+  getPlaces(): VoltiaMarker[] {
+    return this.markers;
+  }
 
+  approvePlace(id: number) {
     return {
-      message: 'Lugar enviado correctamente',
-      data: saved,
+      ok: true,
+      action: 'APPROVED',
+      id,
     };
   }
 
-  async getPlaces() {
-    return await this.placeRepository.find({
-      order: { id: 'ASC' },
-    });
-  }
-
-  async approvePlace(id: number) {
-    const place = await this.placeRepository.findOneBy({ id });
-
-    if (!place) {
-      throw new NotFoundException('Lugar no encontrado');
-    }
-
-    place.status = 'approved';
-    const updated = await this.placeRepository.save(place);
-
+  rejectPlace(id: number) {
     return {
-      message: 'Lugar aprobado',
-      data: updated,
+      ok: true,
+      action: 'REJECTED',
+      id,
     };
   }
 
-  async rejectPlace(id: number) {
-    const place = await this.placeRepository.findOneBy({ id });
-
-    if (!place) {
-      throw new NotFoundException('Lugar no encontrado');
-    }
-
-    place.status = 'rejected';
-    const updated = await this.placeRepository.save(place);
-
+  deletePlace(id: number) {
     return {
-      message: 'Lugar rechazado',
-      data: updated,
-    };
-  }
-
-  async deletePlace(id: number) {
-    const place = await this.placeRepository.findOneBy({ id });
-
-    if (!place) {
-      throw new NotFoundException('Lugar no encontrado');
-    }
-
-    await this.placeRepository.remove(place);
-
-    return {
-      message: 'Lugar eliminado correctamente',
-      data: place,
+      ok: true,
+      action: 'DELETED',
+      id,
     };
   }
 }
