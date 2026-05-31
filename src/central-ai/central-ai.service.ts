@@ -1,79 +1,53 @@
 import { Injectable } from '@nestjs/common';
+import { RealtimeOrchestratorService } from '../realtime-orchestrator/realtime-orchestrator.service';
 
 @Injectable()
 export class CentralAIService {
+  constructor(
+    private readonly realtimeOrchestrator: RealtimeOrchestratorService,
+  ) {}
+
   analyze(data: any) {
-    let score = 0;
-    const reasons: string[] = [];
+    return this.analyzeGlobalThreat(data);
+  }
 
-    if (data.integrityRisk) {
-      score += 40;
-      reasons.push('Integrity Engine reportó riesgo');
-    }
-
-    if (data.deviceRisk) {
-      score += 50;
-      reasons.push('Device Trust reportó riesgo');
-    }
-
-    if (data.geoRisk) {
-      score += 60;
-      reasons.push('GeoLock reportó riesgo');
-    }
-
-    if (data.sessionRisk) {
-      score += 70;
-      reasons.push('Session Monitor reportó riesgo');
-    }
-
-    if (data.threatRisk) {
-      score += 80;
-      reasons.push('Threat AI reportó riesgo');
-    }
-
-    if (data.behaviorRisk) {
-      score += 90;
-      reasons.push('Behavioral AI reportó riesgo');
-    }
-
-    if (data.shadowModeRequired) {
-      score += 60;
-      reasons.push('Shadow Mode requerido');
-    }
-
-    if (data.tacticalResponseRequired) {
-      score += 80;
-      reasons.push('Respuesta táctica requerida');
-    }
-
+  analyzeGlobalThreat(data: any) {
     let level = 'LOW';
     let action = 'ALLOW';
 
-    if (score >= 350) {
+    const alerts: string[] = [];
+
+    if (data.integrityRisk) alerts.push('Integrity Risk');
+    if (data.deviceRisk) alerts.push('Device Risk');
+    if (data.geoRisk) alerts.push('Geo Risk');
+    if (data.sessionRisk) alerts.push('Session Risk');
+    if (data.threatRisk) alerts.push('Threat AI Risk');
+    if (data.behaviorRisk) alerts.push('Behavioral AI Risk');
+    if (data.shadowModeRequired) alerts.push('Shadow Mode Required');
+    if (data.tacticalResponseRequired) alerts.push('Tactical Response Required');
+
+    if (alerts.length >= 6) {
       level = 'CRITICAL';
       action = 'SOS_ESCALATION';
-    } else if (score >= 280) {
+    } else if (alerts.length >= 4) {
       level = 'CRITICAL';
       action = 'LOCKDOWN';
-    } else if (score >= 220) {
+    } else if (alerts.length >= 2) {
       level = 'HIGH';
-      action = 'SHADOW_MODE';
-    } else if (score >= 150) {
-      level = 'HIGH';
-      action = 'FREEZE';
-    } else if (score >= 80) {
+      action = 'FREEZE_SESSION';
+    } else if (alerts.length >= 1) {
       level = 'MEDIUM';
-      action = 'VERIFY';
+      action = 'MONITOR';
     }
 
-    return {
+    const result = {
       success: true,
       centralAI: {
-        score,
+        score: alerts.length * 100,
         level,
         action,
-        trusted: score < 150,
-        reasons,
+        trusted: level === 'LOW',
+        reasons: alerts,
         engine: 'VOLTIA_CENTRAL_AI_ORCHESTRATOR_V1',
         modules: {
           integrityRisk: !!data.integrityRisk,
@@ -87,5 +61,18 @@ export class CentralAIService {
         },
       },
     };
+
+    if (level === 'HIGH' || level === 'CRITICAL') {
+      this.realtimeOrchestrator.broadcastCriticalEvent({
+        event: 'CENTRAL_AI_CRITICAL_EVENT',
+        level,
+        action,
+        device: data.device || 'UNKNOWN_DEVICE',
+        reasons: alerts,
+        engine: 'VOLTIA_CENTRAL_AI_ORCHESTRATOR_V1',
+      });
+    }
+
+    return result;
   }
 }

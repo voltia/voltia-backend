@@ -1,80 +1,52 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-} from '@nestjs/common';
-
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
-
-import {
-  ThrottlerGuard,
-  ThrottlerModule,
-} from '@nestjs/throttler';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from './auth/auth.module';
-import { MapModule } from './map/map.module';
-
-import { SecurityModule } from './security/security.module';
-import { SecurityMiddleware } from './security/middleware/security.middleware';
-
-import { IntegrityModule } from './integrity/integrity.module';
-import { FingerprintModule } from './fingerprint/fingerprint.module';
-import { DeviceTrustModule } from './device-trust/device-trust.module';
-import { SessionMonitorModule } from './session-monitor/session-monitor.module';
-import { GeoLockModule } from './geolock/geolock.module';
-
-import { ThreatAIModule } from './threat-ai/threat-ai.module';
 import { BehavioralAIModule } from './behavioral-ai/behavioral-ai.module';
-import { ShadowModeModule } from './shadow-mode/shadow-mode.module';
-import { TacticalResponseModule } from './tactical-response/tactical-response.module';
 import { CentralAIModule } from './central-ai/central-ai.module';
-
-import { SentinelSocketModule } from './sentinel-socket/sentinel-socket.module';
+import { DeviceTrustModule } from './device-trust/device-trust.module';
+import { FingerprintModule } from './fingerprint/fingerprint.module';
+import { GeoLockModule } from './geolock/geolock.module';
+import { IntegrityModule } from './integrity/integrity.module';
 import { RealtimeOrchestratorModule } from './realtime-orchestrator/realtime-orchestrator.module';
+import { SecurityModule } from './security/security.module';
+import { SentinelModule } from './sentinel/sentinel.module';
+import { SentinelSocketModule } from './sentinel-socket/sentinel-socket.module';
+import { SessionMonitorModule } from './session-monitor/session-monitor.module';
+import { ShadowModeModule } from './shadow-mode/shadow-mode.module';
+import { SosModule } from './sos/sos.module';
+import { TacticalResponseModule } from './tactical-response/tactical-response.module';
+import { ThreatAIModule } from './threat-ai/threat-ai.module';
+import { ThreatIntelligenceModule } from './threat-intelligence/threat-intelligence.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
+    TypeOrmModule.forRoot({
+      type: 'sqlite',
+      database: 'voltia-dev.sqlite',
+      autoLoadEntities: true,
+      synchronize: true,
     }),
 
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 20,
-      },
-    ]),
-
     AuthModule,
-    MapModule,
-    SecurityModule,
-    IntegrityModule,
-    FingerprintModule,
-    DeviceTrustModule,
-    SessionMonitorModule,
-    GeoLockModule,
-    ThreatAIModule,
     BehavioralAIModule,
-    ShadowModeModule,
-    TacticalResponseModule,
     CentralAIModule,
-    SentinelSocketModule,
+    DeviceTrustModule,
+    FingerprintModule,
+    GeoLockModule,
+    IntegrityModule,
     RealtimeOrchestratorModule,
+    SecurityModule,
+    SentinelModule,
+    SentinelSocketModule,
+    SessionMonitorModule,
+    ShadowModeModule,
+    SosModule,
+    TacticalResponseModule,
+    ThreatAIModule,
+    ThreatIntelligenceModule,
   ],
-
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+  controllers: [],
+  providers: [],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(SecurityMiddleware)
-      .forRoutes('*');
-  }
-}
+export class AppModule {}

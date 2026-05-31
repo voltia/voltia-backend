@@ -1,67 +1,324 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>VOLTIA Realtime Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VOLTIA SENTINEL LIVE DASHBOARD</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#06101a;color:#e9fbff;font-family:Arial,Helvetica,sans-serif}
+    header{padding:18px 22px;background:#071522;border-bottom:1px solid #00eaff33}
+    h1{color:#39f3ff;font-size:28px;letter-spacing:1px}
+    header p{color:#9db8c6;margin-top:5px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;padding:16px}
+    .card{background:#0b1b2b;border:1px solid #00eaff30;border-radius:14px;padding:16px;box-shadow:0 0 18px #00eaff12}
+    h2{color:#42f4ff;margin-bottom:12px}
+    #map{height:420px;border-radius:12px;border:1px solid #00eaff40}
+    .status{font-weight:bold;font-size:18px}
+    .online{color:#41ff9c}
+    .offline{color:#ff286d}
+    button{width:100%;padding:14px;margin:8px 0;border:0;border-radius:12px;font-weight:bold;cursor:pointer}
+    .danger{background:#ff0f72;color:#fff}
+    .warn{background:#ffb32c;color:#1a1200}
+    .blue{background:#133855;color:#dff9ff;border:1px solid #00eaff55}
+    .terminal,pre{background:#02070d;color:#dff9ff;border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto}
+    .feed{max-height:360px;overflow:auto}
+    .event{background:#071522;border-left:5px solid #39f3ff;border-radius:10px;padding:12px;margin-bottom:10px}
+    .critical{border-left-color:#ff0f72}
+    .high{border-left-color:#ffb32c}
+    .medium{border-left-color:#ffe44d}
+    .device-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .box{background:#06101a;border:1px solid #00eaff25;border-radius:10px;padding:10px}
+    .label{font-size:12px;color:#8fb3c2}
+    .value{font-weight:bold;margin-top:5px}
+    .full{grid-column:1 / 3}
+  </style>
 </head>
 
 <body>
-  <h1>VOLTIA SENTINEL SOCKET TEST</h1>
+<header>
+  <h1>VOLTIA SENTINEL LIVE DASHBOARD</h1>
+  <p>Realtime Tactical Security Monitoring Center</p>
+</header>
 
-  <button onclick="sendEvent()">Enviar evento crítico</button>
+<div class="grid">
+  <div class="card full">
+    <h2>Sentinel Live Tactical Map</h2>
+    <div id="map"></div>
+  </div>
 
-  <pre id="log"></pre>
+  <div class="card">
+    <h2>Realtime Socket Status</h2>
+    <div id="socketStatus" class="status offline">DESCONECTADO</div>
 
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <button class="danger" onclick="sendThreatIntelligence()">THREAT INTELLIGENCE</button>
+    <button class="blue" onclick="simulateDeviceMovement()">SIMULAR MOVIMIENTO</button>
+    <button class="danger" onclick="sendCentralAIEvent('SOS_ESCALATION')">SOS ESCALATION</button>
+    <button class="warn" onclick="sendCentralAIEvent('LOCKDOWN')">LOCKDOWN</button>
+    <button class="warn" onclick="sendCentralAIEvent('FREEZE_SESSION')">FREEZE SESSION</button>
+    <button class="blue" onclick="sendCentralAIEvent('SHADOW_MODE')">SHADOW MODE</button>
+    <button class="blue" onclick="sendCentralAIEvent('TACTICAL_RESPONSE')">TACTICAL RESPONSE</button>
+  </div>
 
-  <script>
-    const log = document.getElementById('log');
+  <div class="card">
+    <h2>Device Tracker Panel</h2>
+    <div class="device-grid">
+      <div class="box"><div class="label">Device ID</div><div id="deviceId" class="value">ANDROID-001</div></div>
+      <div class="box"><div class="label">Estado</div><div id="deviceStatus" class="value online">ONLINE</div></div>
+      <div class="box"><div class="label">Threat Score</div><div id="threatScore" class="value">0</div></div>
+      <div class="box"><div class="label">Nivel</div><div id="riskLevel" class="value">LOW</div></div>
+      <div class="box"><div class="label">Heat Level</div><div id="heatLevel" class="value">0</div></div>
+      <div class="box"><div class="label">Risk Radius</div><div id="riskRadius" class="value">0m</div></div>
+      <div class="box"><div class="label">Acción</div><div id="action" class="value">NONE</div></div>
+      <div class="box"><div class="label">Eventos</div><div id="eventCount" class="value">0</div></div>
+    </div>
+  </div>
 
-    function write(message) {
-      log.textContent += message + '\n';
+  <div class="card">
+    <h2>Última Amenaza</h2>
+    <pre id="latestAlert">Esperando amenaza...</pre>
+  </div>
+
+  <div class="card">
+    <h2>Live Event Feed</h2>
+    <div id="eventFeed" class="feed"></div>
+  </div>
+
+  <div class="card full">
+    <h2>Realtime Terminal</h2>
+    <div id="terminal" class="terminal"></div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+
+<script>
+  const API = 'http://127.0.0.1:3000';
+
+  const terminal = document.getElementById('terminal');
+  const socketStatus = document.getElementById('socketStatus');
+  const latestAlert = document.getElementById('latestAlert');
+  const eventFeed = document.getElementById('eventFeed');
+
+  let totalEvents = 0;
+
+  function log(msg){
+    terminal.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  const map = L.map('map').setView([40.7128, -74.0060], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'© OpenStreetMap | VOLTIA Sentinel'
+  }).addTo(map);
+
+  const markerLayer = L.layerGroup().addTo(map);
+  const circleLayer = L.layerGroup().addTo(map);
+
+  function colorByLevel(level){
+    if(level === 'CRITICAL') return '#ff0f72';
+    if(level === 'HIGH') return '#ffb32c';
+    if(level === 'MEDIUM') return '#ffe44d';
+    return '#39f3ff';
+  }
+
+  let deviceMarker = null;
+let deviceCircle = null;
+
+  function addMarker(lat,lng,device,level,action,radius){
+    const color = colorByLevel(level);
+
+    if(deviceMarker){
+  markerLayer.removeLayer(deviceMarker);
+}
+
+if(deviceCircle){
+  circleLayer.removeLayer(deviceCircle);
+}
+
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="width:18px;height:18px;border-radius:50%;background:${color};box-shadow:0 0 24px ${color};border:2px solid white"></div>`,
+      iconSize:[18,18],
+      iconAnchor:[9,9]
+    });
+
+    deviceMarker = L.marker([lat,lng],{icon})
+      .addTo(markerLayer)
+      .bindPopup(`<b>${device}</b><br>Nivel: ${level}<br>Acción: ${action}<br>Radio: ${radius}m`);
+
+    deviceCircle = L.circle([lat,lng],{
+      radius: radius || 100,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.12
+    }).addTo(circleLayer);
+
+    map.setView([lat,lng],13);
+  }
+
+  let simLat = 40.7128;
+let simLng = -74.0060;
+let movementTimer = null;
+
+function simulateDeviceMovement(){
+  if(movementTimer){
+    clearInterval(movementTimer);
+    movementTimer = null;
+    log('Movimiento detenido');
+    return;
+  }
+
+  log('Movimiento en tiempo real iniciado');
+
+  movementTimer = setInterval(() => {
+    simLat += (Math.random() - 0.5) * 0.004;
+    simLng += (Math.random() - 0.5) * 0.004;
+
+    addMarker(
+      simLat,
+      simLng,
+      'ANDROID-001',
+      'CRITICAL',
+      'SILENT_SOS_ISOLATION',
+      800
+    );
+
+    log('ANDROID-001 movido: ' + simLat.toFixed(5) + ', ' + simLng.toFixed(5));
+  }, 2000);
+}
+
+  function updatePanel(ti){
+    totalEvents++;
+
+    document.getElementById('deviceId').textContent = ti.device || 'ANDROID-001';
+    document.getElementById('deviceStatus').textContent = 'ONLINE';
+    document.getElementById('threatScore').textContent = ti.score || 0;
+    document.getElementById('riskLevel').textContent = ti.level || 'LOW';
+    document.getElementById('heatLevel').textContent = ti.heatLevel || 0;
+    document.getElementById('riskRadius').textContent = (ti.riskRadiusMeters || 0) + 'm';
+    document.getElementById('action').textContent = ti.recommendedAction || 'NONE';
+    document.getElementById('eventCount').textContent = totalEvents;
+  }
+
+  function addFeed(title,data,level){
+    const div = document.createElement('div');
+    div.className = 'event ' + String(level || '').toLowerCase();
+    div.innerHTML = `<b>${title}</b><br><small>${new Date().toLocaleString()}</small><pre>${JSON.stringify(data,null,2)}</pre>`;
+    eventFeed.prepend(div);
+  }
+
+ const socket = io(API,{
+  transports:['websocket'],
+  reconnection:true,
+  reconnectionAttempts:10,
+  reconnectionDelay:1000
+}); 
+
+  socket.on('connect',()=>{
+    socketStatus.innerHTML = `CONECTADO<br>${socket.id}`;
+    socketStatus.className = 'status online';
+    log('Socket conectado correctamente');
+  });
+
+  socket.on('disconnect',()=>{
+    socketStatus.innerHTML = 'DESCONECTADO';
+    socketStatus.className = 'status offline';
+    log('Socket desconectado');
+  });
+
+  socket.on('connect_error',(err)=>{
+    socketStatus.innerHTML = 'ERROR CONEXIÓN';
+    socketStatus.className = 'status offline';
+    log('ERROR SOCKET: ' + err.message);
+  });
+
+  socket.on('sentinel-alert',(data)=>{
+    latestAlert.textContent = JSON.stringify(data,null,2);
+    addFeed('REALTIME EVENT',data,data.level || data.payload?.level);
+    log('Evento realtime recibido');
+  });
+
+  async function sendThreatIntelligence(){
+    const body = {
+      device:'ANDROID-001',
+      integrityRisk:true,
+      deviceRisk:true,
+      geoRisk:true,
+      sessionRisk:true,
+      behaviorRisk:true,
+      threatRisk:true,
+      clusterRisk:true,
+      hostileProximity:true,
+      sosActive:true,
+      unknownNearbyDevices:5,
+      lat:40.7128,
+      lng:-74.006
+    };
+
+    try{
+      log('Enviando Threat Intelligence...');
+      const response = await fetch(`${API}/threat-intelligence/analyze`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      });
+
+      const data = await response.json();
+      const ti = data.threatIntelligence;
+
+      latestAlert.textContent = JSON.stringify(data,null,2);
+      updatePanel(ti);
+      addFeed(`${ti.level} — ${ti.recommendedAction}`,data,ti.level);
+      addMarker(ti.location.lat,ti.location.lng,ti.device,ti.level,ti.recommendedAction,ti.riskRadiusMeters);
+
+      log(`Threat Intelligence OK: ${ti.level} | Score ${ti.score}`);
+    }catch(error){
+      log('ERROR THREAT INTELLIGENCE: ' + error.message);
     }
+  }
 
-    write('Iniciando cliente VOLTIA...');
+  async function sendCentralAIEvent(actionType){
+    const body = {
+      device:'ANDROID-001',
+      requestedAction:actionType,
+      integrityRisk:true,
+      deviceRisk:true,
+      geoRisk:true,
+      sessionRisk:true,
+      threatRisk:true,
+      behaviorRisk:true,
+      shadowModeRequired: actionType === 'SHADOW_MODE' || actionType === 'SOS_ESCALATION',
+      tacticalResponseRequired:true
+    };
 
-   const socket = io('http://127.0.0.1:3000', {
-  transports: ['polling', 'websocket']
-});
+    try{
+      log('Enviando Central AI: ' + actionType);
 
-    write('SOCKET INICIADO');
+      const response = await fetch(`${API}/central-ai/analyze`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body)
+      });
 
-    socket.on('connect', () => {
-      write('CONECTADO: ' + socket.id);
-    });
+      const data = await response.json();
+      latestAlert.textContent = JSON.stringify(data,null,2);
+      addFeed('CENTRAL AI — ' + actionType,data,data.centralAI?.level || 'CRITICAL');
 
-    socket.on('connect_error', (error) => {
-      write('ERROR DE CONEXIÓN: ' + error.message);
-    });
-
-    socket.on('disconnect', () => {
-      write('DESCONECTADO');
-    });
-
-    socket.on('sentinel-alert', (data) => {
-      write('ALERTA RECIBIDA:');
-      write(JSON.stringify(data, null, 2));
-    });
-
-    function sendEvent() {
-      write('ENVIANDO EVENTO CRÍTICO...');
-
-      socket.emit(
-        'security-event',
-        {
-          risk: 'CRITICAL',
-          action: 'LOCKDOWN',
-          device: 'ANDROID-001'
-        },
-        (response) => {
-          write('RESPUESTA:');
-          write(JSON.stringify(response, null, 2));
-        }
-      );
+      log('Central AI OK: ' + actionType);
+    }catch(error){
+      log('ERROR CENTRAL AI: ' + error.message);
     }
-  </script>
+  }
+
+  addMarker(40.7128,-74.006,'ANDROID-001','LOW','ONLINE',100);
+  log('VOLTIA Sentinel Live Dashboard iniciado...');
+</script>
 </body>
 </html>

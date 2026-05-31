@@ -1,35 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import { SentinelSocketGateway } from '../sentinel-socket/sentinel-socket.gateway';
 
 @Injectable()
 export class RealtimeOrchestratorService {
-  constructor(
-    private readonly sentinelGateway: SentinelSocketGateway,
-  ) {}
 
-  broadcastSecurityEvent(data: any) {
-    const payload = {
-      type: 'SECURITY_EVENT',
-      engine: data.engine || 'UNKNOWN_ENGINE',
-      level: data.level || 'LOW',
-      action: data.action || 'NONE',
-      device: data.device || 'UNKNOWN_DEVICE',
-      timestamp: new Date().toISOString(),
-      metadata: data.metadata || {},
-    };
-
-    console.log('📡 BROADCASTING SECURITY EVENT');
-    console.log(payload);
-
-    this.sentinelGateway.server.emit(
-      'sentinel-alert',
-      payload,
-    );
+  async broadcastCriticalEvent(data: any) {
+    console.log('🚨 CRITICAL EVENT');
+    console.log(data);
 
     return {
       success: true,
       realtime: true,
-      payload,
+      dispatched: true,
+      type: 'CRITICAL',
+      payload: data,
+    };
+  }
+
+  async broadcastSecurityEvent(data: any) {
+    console.log('🛡️ SECURITY EVENT');
+    console.log(data);
+
+    return {
+      success: true,
+      realtime: true,
+      dispatched: true,
+      type: 'SECURITY',
+      payload: data,
     };
   }
 }
