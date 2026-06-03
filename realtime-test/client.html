@@ -36,6 +36,35 @@
     .label{font-size:12px;color:#8fb3c2}
     .value{font-weight:bold;margin-top:5px}
     .full{grid-column:1 / 3}
+   .device-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:15px;
+}
+
+.device-item{
+  background:#101826;
+  border:1px solid #1e3a5f;
+  border-radius:10px;
+  padding:10px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.device-item:hover{
+  border-color:#39f3ff;
+}
+
+.device-online{
+  color:#00ff88;
+  font-weight:700;
+}
+
+.device-offline{
+  color:#ff4d4d;
+  font-weight:700;
+} 
   </style>
 </head>
 
@@ -66,6 +95,7 @@
 
   <div class="card">
     <h2>Device Tracker Panel</h2>
+    <div id="deviceList" class="device-list"></div>
     <div class="device-grid">
       <div class="box"><div class="label">Device ID</div><div id="deviceId" class="value">ANDROID-001</div></div>
       <div class="box"><div class="label">Estado</div><div id="deviceStatus" class="value online">ONLINE</div></div>
@@ -128,18 +158,31 @@
     return '#39f3ff';
   }
 
-  let deviceMarker = null;
-let deviceCircle = null;
+ const deviceMarkers = {};
+const deviceCircles = {};
+const devicesState = {};
 
   function addMarker(lat,lng,device,level,action,radius){
     const color = colorByLevel(level);
 
-    if(deviceMarker){
-  markerLayer.removeLayer(deviceMarker);
+devicesState[device] = {
+  id: device,
+  level,
+  action,
+  radius,
+  lat,
+  lng,
+  status: 'ONLINE'
+};
+
+renderDeviceList();
+
+    if(deviceMarkers[device]){
+  markerLayer.removeLayer(deviceMarkers[device]);
 }
 
-if(deviceCircle){
-  circleLayer.removeLayer(deviceCircle);
+if(deviceCircles[device]){
+  circleLayer.removeLayer(deviceCircles[device]);
 }
 
     const icon = L.divIcon({
@@ -149,48 +192,121 @@ if(deviceCircle){
       iconAnchor:[9,9]
     });
 
-    deviceMarker = L.marker([lat,lng],{icon})
-      .addTo(markerLayer)
-      .bindPopup(`<b>${device}</b><br>Nivel: ${level}<br>Acción: ${action}<br>Radio: ${radius}m`);
+    deviceMarkers[device] = L.marker([lat,lng],{icon})
+  .addTo(markerLayer)
+  .bindPopup(`<b>${device}</b><br>Nivel: ${level}<br>Acción: ${action}<br>Radio: ${radius}m`);
 
-    deviceCircle = L.circle([lat,lng],{
-      radius: radius || 100,
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.12
-    }).addTo(circleLayer);
+deviceCircles[device] = L.circle([lat,lng],{
+  radius: radius || 100,
+  color: color,
+  fillColor: color,
+  fillOpacity: 0.12
+}).addTo(circleLayer);
 
     map.setView([lat,lng],13);
   }
 
-  let simLat = 40.7128;
-let simLng = -74.0060;
+  const simulatedDevices = [
+  {
+    id: 'ANDROID-001',
+    lat: 40.7128,
+    lng: -74.0060,
+    level: 'CRITICAL',
+    action: 'SILENT_SOS_ISOLATION',
+    radius: 800
+  },
+  {
+    id: 'ANDROID-002',
+    lat: 40.7150,
+    lng: -74.0020,
+    level: 'HIGH',
+    action: 'LOCKDOWN',
+    radius: 500
+  },
+  {
+    id: 'IPHONE-001',
+    lat: 40.7105,
+    lng: -74.0100,
+    level: 'MEDIUM',
+    action: 'SHADOW_MODE',
+    radius: 300
+  },
+  {
+    id: 'FAMILY-001',
+    lat: 40.7180,
+    lng: -74.0085,
+    level: 'LOW',
+    action: 'MONITORING',
+    radius: 120
+  }
+];
+
+function renderDeviceList(){
+
+  const list = document.getElementById('deviceList');
+
+  if(!list) return;
+
+  list.innerHTML = '';
+
+  Object.values(devicesState).forEach(device => {
+
+    const item = document.createElement('div');
+
+    item.className = 'device-item';
+
+    item.innerHTML = `
+      <b>${device.id}</b><br>
+      Nivel: ${device.level}<br>
+      Estado:
+      <span class="device-online">
+        ${device.status}
+      </span>
+    `;
+
+    item.onclick = () => {
+
+      map.setView(
+        [device.lat, device.lng],
+        15
+      );
+
+    };
+
+    list.appendChild(item);
+
+  });
+
+}
+
 let movementTimer = null;
 
 function simulateDeviceMovement(){
   if(movementTimer){
     clearInterval(movementTimer);
     movementTimer = null;
-    log('Movimiento detenido');
+    log('Movimiento multi-dispositivo detenido');
     return;
   }
 
-  log('Movimiento en tiempo real iniciado');
+  log('Movimiento multi-dispositivo iniciado');
 
   movementTimer = setInterval(() => {
-    simLat += (Math.random() - 0.5) * 0.004;
-    simLng += (Math.random() - 0.5) * 0.004;
+    simulatedDevices.forEach((device) => {
+      device.lat += (Math.random() - 0.5) * 0.0007;
+      device.lng += (Math.random() - 0.5) * 0.0007;
 
-    addMarker(
-      simLat,
-      simLng,
-      'ANDROID-001',
-      'CRITICAL',
-      'SILENT_SOS_ISOLATION',
-      800
-    );
+      addMarker(
+        device.lat,
+        device.lng,
+        device.id,
+        device.level,
+        device.action,
+        device.radius
+      );
 
-    log('ANDROID-001 movido: ' + simLat.toFixed(5) + ', ' + simLng.toFixed(5));
+      log(`${device.id} movido: ${device.lat.toFixed(5)}, ${device.lng.toFixed(5)}`);
+    });
   }, 2000);
 }
 
