@@ -6,6 +6,7 @@ import { BehavioralAIModule } from './behavioral-ai/behavioral-ai.module';
 import { CentralAIModule } from './central-ai/central-ai.module';
 import { DeviceTrustModule } from './device-trust/device-trust.module';
 import { FingerprintModule } from './fingerprint/fingerprint.module';
+import { FleetModule } from './fleet/fleet.module';
 import { GeoLockModule } from './geolock/geolock.module';
 import { IntegrityModule } from './integrity/integrity.module';
 import { RealtimeOrchestratorModule } from './realtime-orchestrator/realtime-orchestrator.module';
@@ -33,6 +34,7 @@ import { ThreatIntelligenceModule } from './threat-intelligence/threat-intellige
     CentralAIModule,
     DeviceTrustModule,
     FingerprintModule,
+    FleetModule,
     GeoLockModule,
     IntegrityModule,
     RealtimeOrchestratorModule,
