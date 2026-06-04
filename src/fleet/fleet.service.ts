@@ -11,6 +11,8 @@ import { CreateFamilyDto } from './dto/create-family.dto';
 import { RegisterDeviceDto } from './dto/register-device.dto';
 import { RegisterVehicleDto } from './dto/register-vehicle.dto';
 
+import { DeviceLocation } from './entities/device-location.entity';
+
 @Injectable()
 export class FleetService {
   constructor(
@@ -24,8 +26,11 @@ export class FleetService {
     private readonly deviceRepo: Repository<Device>,
 
     @InjectRepository(Vehicle)
-    private readonly vehicleRepo: Repository<Vehicle>,
-  ) {}
+private readonly vehicleRepo: Repository<Vehicle>,
+
+@InjectRepository(DeviceLocation)
+private readonly locationRepo: Repository<DeviceLocation>,
+) {}
 
   async createFamily(dto: CreateFamilyDto) {
     const family = new Family();
@@ -151,4 +156,75 @@ export class FleetService {
       vehicles,
     };
   }
+async updateDeviceLocation(data: {
+  deviceId: string;
+  familyId?: string;
+  userId?: string;
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  heading?: number;
+  accuracy?: number;
+  battery?: number;
+  eventType?: 'NORMAL' | 'SOS' | 'ALERT' | 'GEOFENCE' | 'OFFLINE_SYNC';
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}) {
+  const device = await this.deviceRepo.findOne({
+  where: [
+    { id: data.deviceId },
+    { fingerprint: data.deviceId },
+  ],
+});
+
+  if (!device) {
+    throw new BadRequestException('Dispositivo no encontrado');
+  }
+
+  device.latitude = data.latitude;
+  device.longitude = data.longitude;
+  device.speed = data.speed ?? device.speed;
+  device.heading = data.heading ?? device.heading;
+  device.lastSeenAt = new Date();
+  device.status = data.eventType === 'SOS' ? 'SOS' : 'MOVING';
+
+  await this.deviceRepo.save(device);
+
+  const location = new DeviceLocation();
+
+  location.deviceId = data.deviceId;
+  location.familyId = data.familyId ?? device.familyId;
+  location.userId = data.userId ?? device.ownerId;
+  location.latitude = data.latitude;
+  location.longitude = data.longitude;
+  location.speed = data.speed ?? 0;
+  location.heading = data.heading ?? 0;
+  location.accuracy = data.accuracy ?? 0;
+  location.battery = data.battery ?? null;
+  location.eventType = data.eventType ?? 'NORMAL';
+  location.riskLevel = data.riskLevel ?? 'LOW';
+
+  const savedLocation = await this.locationRepo.save(location);
+
+  return {
+    ok: true,
+    device,
+    location: savedLocation,
+  };
+}
+
+async getDeviceLocationHistory(deviceId: string) {
+  const locations = await this.locationRepo.find({
+    where: { deviceId },
+    order: { createdAt: 'DESC' },
+    take: 100,
+  });
+
+return {
+  ok: true,
+  deviceId,
+  total: locations.length,
+  locations,
+};
+}
+
 }
