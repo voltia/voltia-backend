@@ -226,5 +226,70 @@ return {
   locations,
 };
 }
+async getFamilyLocations(familyId: string) {
+  const devices = await this.deviceRepo.find({
+    where: { familyId },
+  });
 
+  const vehicles = await this.vehicleRepo.find({
+  where: { familyId },
+});
+
+  const locations = await this.locationRepo.find({
+    where: { familyId },
+    order: {
+      createdAt: 'DESC',
+    },
+  });
+
+  const latestLocations = devices.map((device) => {
+    const latest = locations.find(
+      (location) => location.deviceId === device.id
+        || location.deviceId === device.fingerprint,
+    );
+
+    return {
+      deviceId: device.id,
+      fingerprint: device.fingerprint,
+      name: device.name,
+      deviceType: device.deviceType,
+      platform: device.platform,
+      status: device.status,
+      latitude: latest?.latitude ?? null,
+      longitude: latest?.longitude ?? null,
+      speed: latest?.speed ?? null,
+      heading: latest?.heading ?? null,
+      battery: latest?.battery ?? null,
+      lastUpdate: latest?.createdAt ?? null,
+    };
+  });
+
+const vehicleLocations = vehicles.map((vehicle) => {
+  const latest = locations.find(
+    (location) => location.deviceId === vehicle.linkedDeviceId,
+  );
+
+  return {
+    deviceId: vehicle.id,
+    fingerprint: vehicle.linkedDeviceId,
+    name: vehicle.nickname,
+    deviceType: 'VEHICLE',
+    platform: 'GPS',
+    status: vehicle.status,
+    latitude: latest?.latitude ?? null,
+    longitude: latest?.longitude ?? null,
+    speed: latest?.speed ?? null,
+    heading: latest?.heading ?? null,
+    battery: latest?.battery ?? null,
+    lastUpdate: latest?.createdAt ?? null,
+  };
+});
+
+  return {
+    ok: true,
+    familyId,
+   totalDevices: latestLocations.length + vehicleLocations.length,
+devices: [...latestLocations, ...vehicleLocations], 
+  };
+}
 }

@@ -127,7 +127,7 @@
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
 <script>
-  const API = 'http://127.0.0.1:3000';
+  const API = 'http://localhost:3000';
 
   const terminal = document.getElementById('terminal');
   const socketStatus = document.getElementById('socketStatus');
@@ -432,9 +432,45 @@ function simulateDeviceMovement(){
       log('ERROR CENTRAL AI: ' + error.message);
     }
   }
+const FAMILY_ID = '1b0e8571-dc99-480a-ad52-a90d66067828';
 
-  addMarker(40.7128,-74.006,'ANDROID-001','LOW','ONLINE',100);
-  log('VOLTIA Sentinel Live Dashboard iniciado...');
+async function loadFamilyLocations() {
+  try {
+    const response = await fetch(`${API}/fleet/family/${FAMILY_ID}/locations`);
+    const data = await response.json();
+
+    if (!data.ok || !data.devices) {
+      log('No se pudieron cargar dispositivos familiares');
+      return;
+    }
+
+    data.devices.forEach((device) => {
+      if (device.latitude && device.longitude) {
+        addMarker(
+          device.latitude,
+          device.longitude,
+          (device.deviceType === 'VEHICLE' ? '🚗 ' : '📱 ') +
+           (device.name || device.fingerprint || device.deviceId),
+          device.status || 'ONLINE',
+          device.platform || 'UNKNOWN',
+          device.battery || 0
+        );
+      }
+    });
+
+    log('Mapa familiar actualizado: ' + data.totalDevices + ' dispositivos');
+  } catch (error) {
+    log('ERROR cargando mapa familiar: ' + error.message);
+  }
+}
+
+loadFamilyLocations();
+
+setInterval(() => {
+  loadFamilyLocations();
+}, 5000);
+
+log('VOLTIA Sentinel Live Dashboard iniciado...');
 </script>
 </body>
 </html>

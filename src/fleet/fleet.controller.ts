@@ -37,4 +37,9 @@ export class FleetController {
   getDeviceLocationHistory(@Param('deviceId') deviceId: string) {
     return this.fleetService.getDeviceLocationHistory(deviceId);
   }
+
+  @Get('family/:familyId/locations')
+  getFamilyLocations(@Param('familyId') familyId: string) {
+    return this.fleetService.getFamilyLocations(familyId);
+  }
 }
