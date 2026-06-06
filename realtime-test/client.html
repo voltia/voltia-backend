@@ -241,45 +241,78 @@ deviceCircles[device] = L.circle([lat,lng],{
   }
 ];
 
-function renderDeviceList(){
-
+function renderDeviceList() {
   const list = document.getElementById('deviceList');
 
-  if(!list) return;
+  if (!list) return;
 
   list.innerHTML = '';
 
-  Object.values(devicesState).forEach(device => {
-
+  Object.values(devicesState).forEach((device) => {
     const item = document.createElement('div');
-
     item.className = 'device-item';
 
-    item.innerHTML = `
-      <b>${device.id}</b><br>
-      Nivel: ${device.level}<br>
-      Estado:
-      <span class="device-online">
-        ${device.status}
-      </span>
-    `;
+    const deviceName = device.id || device.device || 'DISPOSITIVO SIN NOMBRE';
+
+    const isGroup =
+      device.level === 'GROUP' ||
+      device.action === 'MULTI-DEVICE' ||
+      String(deviceName).includes('Ubicación compartida');
+
+     if (isGroup) {
+  item.innerHTML = `
+    <b>📍 Ubicación compartida</b><br>
+    ${deviceName.replace(/📍 Ubicación compartida \[\d+\]<br>/, '')}<br>
+    Tipo: MULTI-DISPOSITIVO<br>
+    Estado:
+    <span class="device-online">
+      ${device.status || 'ONLINE'}
+    </span>
+  `;
+}else {
+      item.innerHTML = `
+        <b>${deviceName}</b><br>
+        Nivel: ${device.level || 'LOW'}<br>
+        Estado:
+        <span class="device-online">
+          ${device.status || 'ONLINE'}
+        </span>
+      `;
+    }
 
     item.onclick = () => {
+  map.setView([device.lat, device.lng], 17);
 
-      map.setView(
-        [device.lat, device.lng],
-        15
-      );
+  const markerKey = device.id || device.device || deviceName;
 
-    };
+  if (deviceMarkers[markerKey]) {
+    deviceMarkers[markerKey].openPopup();
+  }
+  document.getElementById('deviceId').textContent =
+  deviceName;
+
+document.getElementById('deviceStatus').textContent =
+  device.status || 'ONLINE';
+
+document.getElementById('riskLevel').textContent =
+  device.level || 'LOW';
+
+document.getElementById('action').textContent =
+  device.action || 'NONE';
+
+document.getElementById('eventCount').textContent =
+  device.events || 0;
+
+document.getElementById('heatLevel').textContent =
+  device.heat || 0;
+
+document.getElementById('riskRadius').textContent =
+  `${device.radius || 0}m`;
+};
 
     list.appendChild(item);
-
   });
-
 }
-
-let movementTimer = null;
 
 function simulateDeviceMovement(){
   if(movementTimer){
@@ -444,19 +477,75 @@ async function loadFamilyLocations() {
       return;
     }
 
-    data.devices.forEach((device) => {
-      if (device.latitude && device.longitude) {
-        addMarker(
-          device.latitude,
-          device.longitude,
-          (device.deviceType === 'VEHICLE' ? '🚗 ' : '📱 ') +
-           (device.name || device.fingerprint || device.deviceId),
-          device.status || 'ONLINE',
-          device.platform || 'UNKNOWN',
-          device.battery || 0
-        );
-      }
-    });
+    const grouped = {};
+
+data.devices.forEach((device) => {
+  if (device.latitude && device.longitude) {
+    const key = `${device.latitude},${device.longitude}`;
+
+    if (!grouped[key]) {
+      grouped[key] = {
+        latitude: device.latitude,
+        longitude: device.longitude,
+        devices: [],
+      };
+    }
+
+    grouped[key].devices.push(device);
+  }
+});
+
+Object.values(grouped).forEach((group) => {
+  if (group.devices.length === 1) {
+    const device = group.devices[0];
+
+    addMarker(
+      group.latitude,
+      group.longitude,
+      (device.deviceType === 'VEHICLE' ? '🚗 ' : '📱 ') +
+        (device.name || device.fingerprint || device.deviceId),
+      device.status || 'ONLINE',
+      device.platform || 'UNKNOWN',
+      device.battery || 0
+    );
+} else {
+
+  const names = group.devices
+    .map((device) => {
+      const icon =
+        device.deviceType === 'VEHICLE'
+          ? '🚗 '
+          : '📱 ';
+
+      const name =
+        device.name ||
+        device.fingerprint ||
+        device.deviceId;
+
+      const status =
+        device.status || 'ONLINE';
+
+      const battery =
+        device.battery !== null &&
+        device.battery !== undefined
+          ? ` — ${device.battery}%`
+          : '';
+
+      return `${icon}${name} — ${status}${battery}`;
+    })
+    .join('<br>');
+
+  addMarker(
+    group.latitude,
+    group.longitude,
+    `📍 Ubicación compartida [${group.devices.length}]<br>${names}`,
+    'GROUP',
+    'MULTI-DEVICE',
+    group.devices.length
+  );
+
+} 
+});
 
     log('Mapa familiar actualizado: ' + data.totalDevices + ' dispositivos');
   } catch (error) {
