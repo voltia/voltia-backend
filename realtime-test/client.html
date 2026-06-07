@@ -127,8 +127,7 @@
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
 <script>
-  const API = 'http://localhost:3000';
-
+  const API = 'http://127.0.0.1:3000';
   const terminal = document.getElementById('terminal');
   const socketStatus = document.getElementById('socketStatus');
   const latestAlert = document.getElementById('latestAlert');
@@ -288,33 +287,48 @@ function renderDeviceList() {
   if (deviceMarkers[markerKey]) {
     deviceMarkers[markerKey].openPopup();
   }
+
+  const threat = calculateThreat(device);
+
   document.getElementById('deviceId').textContent =
-  deviceName;
+    isGroup ? 'Ubicación compartida' : deviceName;
 
-document.getElementById('deviceStatus').textContent =
-  device.status || 'ONLINE';
+  document.getElementById('deviceStatus').textContent =
+    device.status || 'ONLINE';
 
-document.getElementById('riskLevel').textContent =
-  device.level || 'LOW';
+  document.getElementById('riskLevel').textContent =
+    threat.level || 'LOW';
 
-document.getElementById('action').textContent =
-  device.action || 'NONE';
+  document.getElementById('action').textContent =
+    threat.recommendedAction || 'NONE';
 
-document.getElementById('eventCount').textContent =
-  device.events || 0;
+  document.getElementById('eventCount').textContent =
+    device.events || 0;
 
-document.getElementById('heatLevel').textContent =
-  device.heat || 0;
+  document.getElementById('heatLevel').textContent =
+    threat.heatLevel || 0;
 
-document.getElementById('riskRadius').textContent =
-  `${device.radius || 0}m`;
+  document.getElementById('riskRadius').textContent =
+    `${threat.riskRadiusMeters || 0}m`;
+
+  document.getElementById('threatScore').textContent =
+    threat.threatScore || 0;
+
+  if (threat.threatScore > 0) {
+    addFeed(
+      'THREAT INTELLIGENCE',
+      `${deviceName}: score ${threat.threatScore}, nivel ${threat.level}, acción ${threat.recommendedAction}`,
+      threat.level
+    );
+  }
 };
 
-    list.appendChild(item);
-  });
+  list.appendChild(item);
+});
+
 }
 
-function simulateDeviceMovement(){
+function simulateDeviceMovement() {
   if(movementTimer){
     clearInterval(movementTimer);
     movementTimer = null;
@@ -343,6 +357,54 @@ function simulateDeviceMovement(){
   }, 2000);
 }
 
+function calculateThreat(device) {
+    let score = 0;
+    let heat = 0;
+    let level = device.level || 'LOW';
+    let action = device.action || 'NONE';
+
+    const speed = Number(device.speed || 0);
+    const battery = Number(device.battery || 0);
+    const radius = Number(device.radius || 0);
+
+    if (speed > 40) {
+        score += 20;
+        heat += 1;
+        action = 'FAST_MOVEMENT';
+    }
+
+    if (battery > 0 && battery < 20) {
+        score += 15;
+        heat += 1;
+        action = 'LOW_BATTERY';
+    }
+
+    if (radius > 100) {
+        score += 20;
+        heat += 1;
+        action = 'WIDE_RADIUS';
+    }
+
+    if (device.status === 'OFFLINE') {
+        score += 50;
+        heat += 3;
+        action = 'DEVICE_OFFLINE';
+    }
+
+    if (score >= 80) level = 'CRITICAL';
+    else if (score >= 50) level = 'HIGH';
+    else if (score >= 25) level = 'MEDIUM';
+    else level = device.level || 'LOW';
+
+    return {
+        threatScore: score,
+        heatLevel: heat,
+        level,
+        recommendedAction: action,
+        riskRadiusMeters: radius
+    };
+}
+
   function updatePanel(ti){
     totalEvents++;
 
@@ -356,12 +418,48 @@ function simulateDeviceMovement(){
     document.getElementById('eventCount').textContent = totalEvents;
   }
 
-  function addFeed(title,data,level){
+  function addFeed(title, data, level) {
+
     const div = document.createElement('div');
-    div.className = 'event ' + String(level || '').toLowerCase();
-    div.innerHTML = `<b>${title}</b><br><small>${new Date().toLocaleString()}</small><pre>${JSON.stringify(data,null,2)}</pre>`;
+
+    const eventLevel =
+        String(level || 'info').toLowerCase();
+
+    const time =
+        new Date().toLocaleTimeString();
+
+    div.className =
+        'event ' + eventLevel;
+
+    div.innerHTML = `
+        <div style="
+            color:#00ffff;
+            font-weight:bold;
+            margin-bottom:4px;
+        ">
+            [${time}] ${title}
+        </div>
+
+        <div style="
+            color:#ffffff;
+            font-size:12px;
+        ">
+            ${
+                typeof data === 'string'
+                    ? data
+                    : JSON.stringify(data, null, 2)
+            }
+        </div>
+    `;
+
     eventFeed.prepend(div);
-  }
+
+    while (eventFeed.children.length > 50) {
+        eventFeed.removeChild(
+            eventFeed.lastChild
+        );
+    }
+}
 
  const socket = io(API,{
   transports:['websocket'],
@@ -370,11 +468,17 @@ function simulateDeviceMovement(){
   reconnectionDelay:1000
 }); 
 
-  socket.on('connect',()=>{
-    socketStatus.innerHTML = `CONECTADO<br>${socket.id}`;
-    socketStatus.className = 'status online';
-    log('Socket conectado correctamente');
-  });
+  socket.on('connect', () => {
+  socketStatus.innerHTML = `CONECTADO<br>${socket.id}`;
+  socketStatus.className = 'status online';
+  log('Socket conectado correctamente');
+
+  addFeed(
+    'SISTEMA',
+    'Socket conectado correctamente',
+    'success'
+  );
+});
 
   socket.on('disconnect',()=>{
     socketStatus.innerHTML = 'DESCONECTADO';
