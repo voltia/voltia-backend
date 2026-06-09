@@ -13,6 +13,8 @@ import { RegisterVehicleDto } from './dto/register-vehicle.dto';
 
 import { DeviceLocation } from './entities/device-location.entity';
 
+import { MapGateway } from '../map/map.gateway';
+
 @Injectable()
 export class FleetService {
   constructor(
@@ -30,6 +32,8 @@ private readonly vehicleRepo: Repository<Vehicle>,
 
 @InjectRepository(DeviceLocation)
 private readonly locationRepo: Repository<DeviceLocation>,
+
+private readonly mapGateway: MapGateway,
 ) {}
 
   async createFamily(dto: CreateFamilyDto) {
@@ -203,13 +207,26 @@ async updateDeviceLocation(data: {
   location.eventType = data.eventType ?? 'NORMAL';
   location.riskLevel = data.riskLevel ?? 'LOW';
 
-  const savedLocation = await this.locationRepo.save(location);
+ const savedLocation = await this.locationRepo.save(location);
 
-  return {
-    ok: true,
-    device,
-    location: savedLocation,
-  };
+this.mapGateway.emitMapEvent({
+  type: 'LOCATION_UPDATE',
+  deviceId: data.deviceId,
+  familyId: data.familyId,
+  latitude: data.latitude,
+  longitude: data.longitude,
+  speed: data.speed ?? 0,
+  heading: data.heading ?? 0,
+  riskLevel: data.riskLevel ?? 'LOW',
+  eventType: data.eventType ?? 'NORMAL',
+  timestamp: new Date(),
+});
+
+return {
+  ok: true,
+  device,
+  location: savedLocation,
+};
 }
 
 async getDeviceLocationHistory(deviceId: string) {
