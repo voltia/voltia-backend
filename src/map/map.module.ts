@@ -2,9 +2,16 @@ import { Module } from '@nestjs/common';
 
 import { MapController } from './map.controller';
 import { MapService } from './map.service';
+import { MapGateway } from './map.gateway';
 
 @Module({
   controllers: [MapController],
-  providers: [MapService],
+  providers: [
+    MapService,
+    MapGateway,
+  ],
+  exports: [
+    MapGateway,
+  ],
 })
 export class MapModule {}

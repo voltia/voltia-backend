@@ -1,15 +1,21 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { FleetController } from './fleet.controller';
 import { FleetService } from './fleet.service';
+
 import { Family } from './entities/family.entity';
 import { FamilyMember } from './entities/family-member.entity';
 import { Device } from './entities/device.entity';
 import { Vehicle } from './entities/vehicle.entity';
 import { DeviceLocation } from './entities/device-location.entity';
 
+import { MapModule } from '../map/map.module';
+
 @Module({
   imports: [
+    MapModule,
+
     TypeOrmModule.forFeature([
       Family,
       FamilyMember,
@@ -18,8 +24,11 @@ import { DeviceLocation } from './entities/device-location.entity';
       DeviceLocation,
     ]),
   ],
+
   controllers: [FleetController],
+
   providers: [FleetService],
+
   exports: [FleetService],
 })
 export class FleetModule {}
